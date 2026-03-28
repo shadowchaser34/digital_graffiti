@@ -70,11 +70,15 @@ class MyApp extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'widgets/canvas_widget.dart';
+import 'screens/home_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Firebase is optional for local-only runs on a device.
+  }
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -85,9 +89,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: CanvasWidget(),
-      ),
+      home: HomeScreen(),
     );
   }
 }

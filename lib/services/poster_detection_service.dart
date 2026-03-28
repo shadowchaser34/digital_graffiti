@@ -117,7 +117,6 @@ class PosterDetectionService {
     return sum / a.length;
   }
 }
-<<<<<<< HEAD
 import 'dart:async';
 import 'dart:io';
 import 'package:google_ml_kit/google_ml_kit.dart';
@@ -146,7 +145,6 @@ class PosterDetectionService {
     _labeler.close();
   }
 }
-=======
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -332,4 +330,3 @@ class PosterDetectionService {
     return total / length;
   }
 }
->>>>>>> 751584e08c0bc3fbce2cc3119d3ee38487e16849

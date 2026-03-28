@@ -1,14 +1,22 @@
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+<<<<<<< HEAD
 import 'package:permission_handler/permission_handler.dart';
 import 'widgets/canvas_widget.dart';
 import 'services/poster_detection_service.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
+=======
+>>>>>>> 751584e08c0bc3fbce2cc3119d3ee38487e16849
 
-class CameraScreen extends StatefulWidget {
+import 'widgets/camera_background.dart';
+import 'widgets/canvas_widget.dart';
+import 'widgets/toolbar.dart';
+
+/// Dedicated camera-first screen that shows the live preview behind the canvas.
+class CameraScreen extends StatelessWidget {
   const CameraScreen({super.key});
 
   @override
+<<<<<<< HEAD
   State<CameraScreen> createState() => _CameraScreenState();
 }
 
@@ -122,6 +130,19 @@ class _CameraScreenState extends State<CameraScreen> {
               ),
             ),
         ],
+=======
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.black,
+      body: CameraBackground(
+        overlay: Stack(
+          children: [
+            const CanvasWidget(),
+            const Positioned(top: 12, left: 12, child: ToolBar()),
+          ],
+        ),
+>>>>>>> 751584e08c0bc3fbce2cc3119d3ee38487e16849
       ),
     );
   }

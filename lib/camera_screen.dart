@@ -3,21 +3,23 @@ import 'widgets/camera_background.dart';
 import 'widgets/canvas_widget.dart';
 import 'widgets/toolbar.dart';
 
-// TODO: Integrează aici logica avansată de detecție poster, folosind PosterDetectionService din services/poster_detection_service.dart
-
 /// Dedicated camera-first screen that shows the live preview behind the canvas.
 class CameraScreen extends StatelessWidget {
   const CameraScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Exemplu: folosește CameraBackground și CanvasWidget, integrează detecția posterului conform noii logici
-    return Stack(
-      children: const [
-        CameraBackground(),
-        CanvasWidget(),
-        Toolbar(),
-      ],
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.black,
+      body: CameraBackground(
+        overlay: Stack(
+          children: [
+            const CanvasWidget(),
+            const Positioned(top: 12, left: 12, child: Toolbar()),
+          ],
+        ),
+      ),
     );
   }
 }

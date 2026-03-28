@@ -5,6 +5,8 @@ import '../models/sticker_model.dart';
 import '../models/presence.dart';
 import '../services/firebase_service.dart';
 import 'auth_provider.dart';
+import 'poster_provider.dart';
+import '../models/poster_catalog.dart';
 
 /// Provides a singleton [FirebaseService] instance to providers/widgets.
 final firebaseServiceProvider = Provider((ref) => FirebaseService());
@@ -16,7 +18,12 @@ final canvasProvider = StateNotifierProvider<CanvasNotifier, CanvasState>(
   (ref) {
     final svc = ref.read(firebaseServiceProvider);
     final auth = ref.read(authInfoProvider);
-    return CanvasNotifier(svc, auth?.uid ?? 'anonymous');
+    final posterId = ref.read(activePosterIdProvider) ?? defaultPosterId;
+    final notifier = CanvasNotifier(svc, auth?.uid ?? 'anonymous', posterId);
+    ref.listen<String?>(activePosterIdProvider, (previous, next) {
+      notifier.setPosterId(next ?? defaultPosterId);
+    });
+    return notifier;
   },
 );
 
@@ -55,28 +62,49 @@ class CanvasState {
 class CanvasNotifier extends StateNotifier<CanvasState> {
   final FirebaseService _svc;
   final String _uid;
+  String _posterId;
   StreamSubscription<List<Stroke>>? _stSub;
   StreamSubscription<List<StickerModel>>? _stkrSub;
+  StreamSubscription<List<Presence>>? _presenceSub;
   final List<Stroke> _undoStack = [];
   final List<Stroke> _redoStack = [];
 
-  CanvasNotifier(this._svc, this._uid) : super(CanvasState()) {
-    _stSub = _svc.strokesStream().listen((list) {
+  CanvasNotifier(this._svc, this._uid, this._posterId) : super(CanvasState()) {
+    _subscribe();
+  }
+
+  void _subscribe() {
+    _stSub?.cancel();
+    _stkrSub?.cancel();
+    _presenceSub?.cancel();
+
+    _stSub = _svc.strokesStream(posterId: _posterId).listen((list) {
       state = state.copyWith(strokes: list);
     });
-    _stkrSub = _svc.stickersStream().listen((list) {
+    _stkrSub = _svc.stickersStream(posterId: _posterId).listen((list) {
       state = state.copyWith(stickers: list);
     });
-    // subscribe to presence
-    _svc.presenceStream().listen((list) {
+    _presenceSub = _svc.presenceStream(posterId: _posterId).listen((list) {
       state = state.copyWith(presence: list);
     });
+  }
+
+  void setPosterId(String posterId) {
+    if (posterId == _posterId) {
+      return;
+    }
+    _posterId = posterId;
+    _undoStack.clear();
+    _redoStack.clear();
+    state = CanvasState();
+    _subscribe();
   }
 
   @override
   void dispose() {
     _stSub?.cancel();
     _stkrSub?.cancel();
+    _presenceSub?.cancel();
     super.dispose();
   }
 
@@ -122,6 +150,7 @@ class CanvasNotifier extends StateNotifier<CanvasState> {
   Future<void> setPresence(double x, double y, bool isDrawing, int colorValue) async {
     final p = Presence(
       userId: _uid,
+      posterId: _posterId,
       x: x,
       y: y,
       isDrawing: isDrawing,

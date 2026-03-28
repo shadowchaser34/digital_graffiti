@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 class Stroke {
   final String id;
   final String userId;
+  final String posterId;
   final List<Offset> points;
   final Color color;
   final double thickness;
@@ -16,6 +17,7 @@ class Stroke {
   Stroke({
     required this.id,
     required this.userId,
+    required this.posterId,
     required this.points,
     required this.color,
     required this.thickness,
@@ -26,6 +28,7 @@ class Stroke {
   Map<String, dynamic> toMap() => {
         'id': id,
         'userId': userId,
+        'posterId': posterId,
         'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
         'color': color.value,
         'thickness': thickness,
@@ -45,6 +48,7 @@ class Stroke {
     return Stroke(
       id: m['id'] as String,
       userId: m['userId'] as String,
+      posterId: (m['posterId'] as String?) ?? 'poster-1',
       points: pts,
       color: Color((m['color'] as int)),
       thickness: (m['thickness'] as num).toDouble(),

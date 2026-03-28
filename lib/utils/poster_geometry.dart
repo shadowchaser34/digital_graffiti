@@ -62,17 +62,10 @@ class PosterGeometry {
   }
 
   static Offset? screenToLocal(Offset screenPoint, PosterPose pose, Size size) {
-    final corners = pose.isValid ? pose.corners : fallbackPose(defaultPosterId, size).corners;
     if (!pose.isValid) {
-      final rect = fallbackRect(size);
-      if (!rect.contains(screenPoint)) {
-        return null;
-      }
-      return Offset(
-        (screenPoint.dx - rect.left) / rect.width,
-        (screenPoint.dy - rect.top) / rect.height,
-      );
+      return null;
     }
+    final corners = pose.corners;
 
     var u = 0.5;
     var v = 0.5;
@@ -101,11 +94,11 @@ class PosterGeometry {
       return null;
     }
 
-    if (u < -0.05 || u > 1.05 || v < -0.05 || v > 1.05) {
+    if (u < 0.0 || u > 1.0 || v < 0.0 || v > 1.0) {
       return null;
     }
 
-    return Offset(u.clamp(0.0, 1.0), v.clamp(0.0, 1.0));
+    return Offset(u, v);
   }
 
   static bool isInsidePoster(Offset screenPoint, PosterPose pose, Size size) {

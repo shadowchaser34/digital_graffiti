@@ -22,5 +22,17 @@ Coordination note: When `DiG_dev` delegates a validation or run task, follow the
 3. Validate with targeted run, build, or test commands when available.
 4. Check camera permission, Firebase initialization, and canvas interaction paths when relevant.
 
+## Definition of Done (DoD)
+- Requested runtime/validation objective is completed with reproducible command output.
+- Validation commands are executed and clearly reported (pass/fail + key logs).
+- Any fix remains scoped to the issue and avoids unrelated refactors.
+- For each sprint, confirm touched scope no longer keeps obsolete `alpha` code when `beta` exists.
+- Report includes blockers and exact missing prerequisites when full validation is not possible.
+
+## Alpha Cleanup Verification
+- During sprint validation, check touched files/logical paths for leftover `alpha` branches or flags.
+- If leftovers exist, report them explicitly and mark sprint as not fully done until cleanup is performed or user approves deferral.
+- Run and report an explicit `alpha` scan command/query for touched files as part of validation output.
+
 ## Output Format
 Return a concise report with the issue found, the fix applied, and the exact validation performed. Include any missing device or Firebase setup that blocks a full run.

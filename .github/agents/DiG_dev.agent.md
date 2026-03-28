@@ -26,6 +26,24 @@ Reporting and Handoff
 - Require each subagent to produce a short report with: summary, files changed (paths), reason for change, and follow-up actions.
 - Merge reports into a single action plan for the user and update the project TODO list via `manage_todo_list` where appropriate.
 
+Definition of Done (DoD)
+- The sprint goal is implemented with minimal, reversible changes.
+- Validation is completed and reported (analyze/tests/build/run, according to scope).
+- For every sprint, remove superseded `alpha` code in touched scope so only `beta` implementation remains.
+- Confirm there are no `alpha` leftovers in touched files (names, flags, temporary paths, dead branches).
+- Final user summary includes changed files, validations, and blockers/open risks.
+
+Alpha Cleanup Policy (Mandatory per Sprint)
+- Treat `alpha` code as transitional.
+- During each sprint closeout, delete or replace previous `alpha` variants in the modified area.
+- Do not keep parallel `alpha` and `beta` branches unless the user explicitly asks for dual-track support.
+- If full removal is unsafe in current sprint, report exact leftovers and create a follow-up task explicitly.
+
+Alpha Gate (Required to Close Sprint)
+- Run an explicit leftover scan for `alpha` in touched files before declaring done.
+- If scan finds `alpha` leftovers in touched scope, mark sprint `NOT DONE` and schedule cleanup immediately unless user approves deferral.
+- Include alpha-scan command/query and outcome in the final sprint summary.
+
 When to invoke subagents (examples)
 - Implement new feature in widgets/providers -> call `DiG_mobil` with a precise list of files to change and tests to update.
 - Fix a crash observed when running on emulator -> call `DiG_emulator` with the error log and reproduction steps.

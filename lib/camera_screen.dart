@@ -1,15 +1,16 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'models/poster_catalog.dart';
 import 'providers/poster_provider.dart';
 import 'services/opencode_poster_recognition_service.dart';
-import 'utils/poster_geometry.dart';
+import 'services/polling_interval_policy.dart';
+import 'services/poster_lock_stabilizer.dart';
 import 'widgets/canvas_widget.dart';
 import 'widgets/participants_indicator.dart';
 import 'widgets/toolbar.dart';
@@ -21,16 +22,86 @@ class CameraScreen extends ConsumerStatefulWidget {
   ConsumerState<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends ConsumerState<CameraScreen> {
+class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBindingObserver {
   CameraController? controller;
-  Timer? _detectionTimer;
+  Timer? _lostFlashTimer;
   bool _isDetecting = false;
+  bool _streamDetectionEnabled = false;
+  int _nextDetectionAtMs = 0;
+  bool _lostFlashVisible = false;
+  bool _lostFlashStrong = false;
+  bool? _previousLocked;
+  int _stableLockedCycles = 0;
+  static const PollingIntervalPolicy _pollingIntervalPolicy = PollingIntervalPolicy();
   final _recognitionService = OpenCodePosterRecognitionService.fromEnvironment();
+  final _lockStabilizer = PosterLockStabilizer();
+
+  void _resetStableLockedCycles() {
+    _stableLockedCycles = 0;
+  }
+
+  void _triggerLostTransitionFeedback() {
+    HapticFeedback.heavyImpact();
+    if (!mounted) return;
+
+    _lostFlashTimer?.cancel();
+
+    // 2-step aggressive pulse: strong flash + heavy/medium haptic combo.
+    setState(() {
+      _lostFlashVisible = true;
+      _lostFlashStrong = true;
+    });
+    _lostFlashTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      setState(() {
+        _lostFlashVisible = false;
+        _lostFlashStrong = false;
+      });
+
+      HapticFeedback.mediumImpact();
+      _lostFlashTimer = Timer(const Duration(milliseconds: 90), () {
+        if (!mounted) return;
+        setState(() {
+          _lostFlashVisible = true;
+          _lostFlashStrong = false;
+        });
+
+        _lostFlashTimer = Timer(const Duration(milliseconds: 140), () {
+          if (!mounted) return;
+          setState(() {
+            _lostFlashVisible = false;
+            _lostFlashStrong = false;
+          });
+        });
+      });
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     initCamera();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final currentController = controller;
+    if (currentController == null || !currentController.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _streamDetectionEnabled = false;
+      if (currentController.value.isStreamingImages) {
+        unawaited(currentController.stopImageStream().catchError((_) {}));
+      }
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_startPosterStreamOrFallback());
+    }
   }
 
   Future<void> initCamera() async {
@@ -71,7 +142,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
         ResolutionPreset.high,
       );
       await controller!.initialize();
-      _startPosterPolling();
+      try {
+        await controller!.setFlashMode(FlashMode.off);
+      } catch (_) {
+        // Some devices may not support changing flash mode here.
+      }
+      await _startPosterStreamOrFallback();
       if (mounted) {
         setState(() {});
       }
@@ -85,49 +161,143 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     }
   }
 
-  void _startPosterPolling() {
-    _detectionTimer?.cancel();
-    if (!_recognitionService.isConfigured) {
+  Future<void> _startPosterStreamOrFallback() async {
+    final currentController = controller;
+    if (currentController == null || !currentController.value.isInitialized) {
       return;
     }
 
-    _detectionTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      _detectPoster();
-    });
+    if (currentController.value.isStreamingImages) {
+      _streamDetectionEnabled = true;
+      return;
+    }
+
+    try {
+      await currentController.startImageStream(_onCameraImage);
+      _streamDetectionEnabled = true;
+      _nextDetectionAtMs = 0;
+    } catch (_) {
+      _streamDetectionEnabled = false;
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Image stream indisponibil. Folosește selecția manuală de poster.'),
+        ),
+      );
+    }
   }
 
-  Future<void> _detectPoster() async {
-    final currentController = controller;
-    if (_isDetecting || currentController == null || !currentController.value.isInitialized || !mounted) {
-      return;
-    }
-    if (currentController.value.isTakingPicture) {
+  Duration _currentPollingInterval() {
+    final activePose = ref.read(activePosterPoseProvider);
+    final isPosterLocked = activePose != null && activePose.isValid;
+    return _pollingIntervalPolicy.intervalForState(
+      isPosterLocked: isPosterLocked,
+      stableLockedCycles: _stableLockedCycles,
+    );
+  }
+
+  void _onCameraImage(CameraImage image) {
+    if (!_streamDetectionEnabled || _isDetecting || !mounted) {
       return;
     }
 
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    if (nowMs < _nextDetectionAtMs) {
+      return;
+    }
+
+    _nextDetectionAtMs = nowMs + _currentPollingInterval().inMilliseconds;
     _isDetecting = true;
+    unawaited(_detectPosterFromStream(image));
+  }
+
+  Future<void> _detectPosterFromStream(CameraImage image) async {
+    final currentController = controller;
+    if (currentController == null || !currentController.value.isInitialized || !mounted) {
+      return;
+    }
+    if (image.planes.isEmpty) {
+      return;
+    }
+
     try {
-      final shot = await currentController.takePicture();
-      final bytes = await File(shot.path).readAsBytes();
-      final pose = await _recognitionService.recognizePoster(
-        frameBytes: bytes,
+      try {
+        await currentController.setFlashMode(FlashMode.off);
+      } catch (_) {
+        // Ignore flash-mode failures and continue detection.
+      }
+
+      final viewport = MediaQuery.of(context).size;
+      final pose = await _recognitionService.recognizePosterFromLumaFrame(
+        lumaBytes: image.planes.first.bytes,
+        frameWidth: image.width,
+        frameHeight: image.height,
         candidates: posterCatalog,
+        viewportSize: viewport,
       );
-      if (!mounted || pose == null) {
+      if (!mounted) {
+        return;
+      }
+      final decision = _lockStabilizer.processDetection(
+        detectedPose: pose,
+        activePose: ref.read(activePosterPoseProvider),
+      );
+
+      final activePose = ref.read(activePosterPoseProvider);
+      final wasLocked = activePose != null && activePose.isValid;
+      final lockedPosterId = wasLocked ? activePose.posterId : null;
+
+      if (!wasLocked) {
+        _resetStableLockedCycles();
+      } else {
+        final keepsSamePoster =
+            pose != null &&
+            pose.posterId == lockedPosterId &&
+            !decision.clearPose &&
+            decision.nextPose != null &&
+            decision.nextPose!.posterId == lockedPosterId;
+
+        if (keepsSamePoster) {
+          _stableLockedCycles += 1;
+        } else {
+          // Any miss, low-confidence hold, or switch candidate drops back to baseline lock speed.
+          _resetStableLockedCycles();
+        }
+      }
+
+      if (!decision.shouldChange) {
         return;
       }
 
-      ref.read(activePosterIdProvider.notifier).state = pose.posterId;
-      ref.read(activePosterPoseProvider.notifier).state = pose;
+      if (decision.clearPose) {
+        ref.read(activePosterPoseProvider.notifier).state = null;
+        return;
+      }
+
+      final nextPose = decision.nextPose;
+      if (nextPose == null) {
+        return;
+      }
+
+      ref.read(activePosterIdProvider.notifier).state = nextPose.posterId;
+      ref.read(activePosterPoseProvider.notifier).state = nextPose;
     } catch (_) {
-      // The manual poster picker remains available if detection fails.
+      _resetStableLockedCycles();
+      final decision = _lockStabilizer.processDetection(
+        detectedPose: null,
+        activePose: ref.read(activePosterPoseProvider),
+      );
+      if (decision.clearPose && mounted) {
+        ref.read(activePosterPoseProvider.notifier).state = null;
+      }
     } finally {
       _isDetecting = false;
     }
   }
 
   Future<void> _pickPosterManually() async {
-    final size = MediaQuery.of(context).size;
     final chosen = await showModalBottomSheet<PosterCatalogEntry>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -151,13 +321,36 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
     }
 
     ref.read(activePosterIdProvider.notifier).state = chosen.id;
-    ref.read(activePosterPoseProvider.notifier).state = PosterGeometry.fallbackPose(chosen.id, size);
+    ref.read(activePosterPoseProvider.notifier).state = null;
+    _lockStabilizer.reset();
+    _resetStableLockedCycles();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Poster selectat: ${chosen.name}. Arată afișul în cameră pentru lock precis.'),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    _detectionTimer?.cancel();
-    controller?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _lostFlashTimer?.cancel();
+    _streamDetectionEnabled = false;
+
+    final currentController = controller;
+    controller = null;
+    if (currentController != null) {
+      if (currentController.value.isStreamingImages) {
+        unawaited(
+          currentController
+              .stopImageStream()
+              .catchError((_) {})
+              .whenComplete(currentController.dispose),
+        );
+      } else {
+        unawaited(currentController.dispose());
+      }
+    }
     super.dispose();
   }
 
@@ -165,6 +358,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
     final initialized = controller != null && controller!.value.isInitialized;
+    final activePosterId = ref.watch(activePosterIdProvider) ?? defaultPosterId;
+    final activePose = ref.watch(activePosterPoseProvider);
+    final isPosterLocked = activePose != null && activePose.isValid;
+
+    if (_previousLocked == null) {
+      _previousLocked = isPosterLocked;
+    } else if (_previousLocked == true && !isPosterLocked) {
+      _previousLocked = isPosterLocked;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _triggerLostTransitionFeedback();
+      });
+    } else {
+      _previousLocked = isPosterLocked;
+    }
+
+    final activePosterName = posterCatalog
+        .where((poster) => poster.id == activePosterId)
+        .map((poster) => poster.name)
+        .cast<String?>()
+        .firstWhere((name) => name != null, orElse: () => null) ??
+        activePosterId;
 
     return Scaffold(
       body: Stack(
@@ -189,7 +403,27 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
                     ),
                   ),
           ),
-          const Positioned.fill(child: CanvasWidget()),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 90),
+                opacity: _lostFlashVisible ? 1.0 : 0.0,
+                child: Container(
+                  color: _lostFlashStrong
+                      ? const Color(0x99FF1744)
+                      : const Color(0x66FF5252),
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+  child: Consumer(
+    builder: (context, ref, _) {
+      final pose = ref.watch(activePosterPoseProvider);
+      return CanvasWidget(posterPose: pose);
+    },
+  ),
+),
           const Positioned.fill(child: ParticipantsIndicator()),
           Positioned(
             top: topInset + 8,
@@ -203,6 +437,51 @@ class _CameraScreenState extends ConsumerState<CameraScreen> {
               onPressed: _pickPosterManually,
               icon: const Icon(Icons.photo_size_select_actual_outlined),
               label: const Text('Poster'),
+            ),
+          ),
+          Positioned(
+            top: topInset + 58,
+            left: 12,
+            right: 12,
+            child: IgnorePointer(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isPosterLocked
+                      ? const Color(0xCC1B5E20)
+                      : const Color(0xCCB71C1C),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isPosterLocked
+                        ? const Color(0xFF66BB6A)
+                        : const Color(0xFFEF5350),
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isPosterLocked ? Icons.lock : Icons.lock_open,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isPosterLocked
+                          ? 'Poster locked • desen permis pe $activePosterName'
+                          : 'Poster lost • desen blocat până la re-detectare',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

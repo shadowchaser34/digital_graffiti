@@ -10,6 +10,7 @@ final authInfoProvider = StateNotifierProvider<AuthInfoNotifier, AuthInfo?>(
 class AuthInfoNotifier extends StateNotifier<AuthInfo?> {
   final AuthService _service;
   AuthInfoNotifier(this._service) : super(null) {
+    state = _service.cachedAuthInfo;
     _init();
   }
 

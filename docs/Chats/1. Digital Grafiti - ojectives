@@ -1,0 +1,365 @@
+Digital Graffiti Wall objectives and implementation brief.
+
+## App Goal
+
+Build a production-quality Flutter mobile app for a university project: a real-time collaborative graffiti wall where multiple users can draw on a shared canvas and place stickers over an image-based poster.
+
+## Core Requirements
+
+### Canvas
+
+* Use touch gestures for freehand drawing.
+* Render strokes with `CustomPainter`.
+* Store each stroke as vector data: points, color, thickness.
+* Never store drawings as bitmap images.
+
+### Real-Time Collaboration
+
+* Sync strokes, stickers, and presence in real time.
+* Use Firebase services for auth and data sync.
+* Send only incremental updates, not full-canvas snapshots.
+* Handle multiple users drawing at the same time.
+
+### Stickers
+
+* Support PNG stickers on the canvas.
+* Store sticker position, scale, and rotation.
+* Persist stickers and sync them across devices.
+
+### User System
+
+* Use anonymous Firebase Auth.
+* Assign each user a stable ID and color.
+* Distinguish strokes by user.
+
+## Architecture
+
+* Presentation: screens, widgets, toolbar, canvas overlay.
+* Domain: drawing state, undo/redo, sticker placement logic.
+* Data: Firebase services for auth, Firestore, and presence sync.
+* State management: Riverpod.
+
+## UI Requirements
+
+* Main canvas screen with drawing overlay.
+* Toolbar with color picker, brush size selector, sticker picker, undo/redo.
+* Clean, responsive mobile UI.
+
+## Bonus Features To Keep
+
+* Per-user undo/redo.
+* Presence indicators for active collaborators.
+* Team/color grouping if needed later.
+* Small performance optimizations such as throttling presence updates.
+
+## Delivery Notes
+
+* Keep the code modular and beginner-friendly.
+* Add comments only where they clarify non-obvious logic.
+* The app should run with Firebase configured on Android/iOS, and should degrade safely when Firebase is unavailable during local development.
+* Prefer minimal, safe edits over broad refactors when iterating on this project.
+Progress update: I added presence support (model + Firestore methods), subscribed presence in the canvas provider, and updated the canvas to push presence while drawing. Next I'll:
+
+- Implement undo/redo stacks (client-side) and wire redo UI.
+- Add comments and polish code + inline run instructions.
+- Optionally add sticker placement UI if you want it now.
+
+Do you want me to implement undo/redo next, or add sticker placement UI first?
+
+Made changes.
+
+User: undo redo than placement ui 
+
+GitHub Copilot: I'll update Firebase service, add undo/redo stacks to the canvas provider, add sticker placement providers, and wire toolbar + canvas to place stickers. Applying code changes now.
+
+Generating patch (13 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+
+```
+
+```
+
+
+Generating patch (45 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/canvas_provider.dart)
+
+
+```
+
+```
+
+
+Generating patch (11 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/sticker_provider.dart)
+
+
+```
+
+```
+
+
+Generating patch (45 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/toolbar.dart)
+
+
+```
+
+```
+
+
+Generating patch (44 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/canvas_widget.dart)
+
+
+```
+
+```
+Done — I implemented:
+
+- Undo/redo stacks in `lib/providers/canvas_provider.dart` (local per-user stacks; undo removes stroke document, redo re-adds it).
+- `deleteStrokeById` in `lib/services/firebase_service.dart`.
+- Sticker placement flow:
+  - `lib/providers/sticker_provider.dart` holds selected sticker + placing mode.
+  - Toolbar now includes a sticker picker and sets placing mode.
+  - `CanvasWidget` handles `onTapUp` to place stickers and calls `addSticker`.
+  - Sticker add reuses `FirebaseService.addSticker`.
+
+Progress update: undo/redo + sticker placement plumbing added. Next I'll:
+- Add UI feedback for placing mode and show placed stickers on the canvas.
+- Add comments and final polish.
+
+Do you want me to render placed stickers on the canvas now (so users see stickers), and add an on-canvas transform UI (scale/rotate) for stickers?
+
+Made changes.
+
+User: add presence / visual indicators
+
+GitHub Copilot: I'll read the `canvas_provider.dart` to verify state/presence integration before editing.
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/canvas_provider.dart)
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/screens/home_screen.dart)
+
+I'll patch canvas_provider.dart to remove the duplicate constructor and update home_screen.dart to include `ParticipantsIndicator`. Then I'll update the todo list.
+
+Generating patch (32 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/canvas_provider.dart)
+
+
+```
+
+```
+
+
+Generating patch (25 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/screens/home_screen.dart)
+
+
+```
+
+```
+
+
+Completed: *Add presence / visual indicators* (7/9)
+
+Done — presence indicators added and wired.
+
+What I changed:
+- Fixed `CanvasState` constructor in `lib/providers/canvas_provider.dart`.
+- Added `ParticipantsIndicator` overlay to `lib/screens/home_screen.dart`.
+- Marked presence work complete in the todo list.
+
+Next I can:
+- Render placed stickers on the canvas and add transform handles.
+- Add comments and polish across files.
+Which should I do next?
+
+Made changes.
+
+User: implement undo redo
+
+GitHub Copilot: I'll inspect toolbar and canvas provider to ensure undo/redo UI is wired and working, then add missing UI and comments. I'll update code as needed.
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/toolbar.dart)
+
+I'm updating the canvas provider to expose `canUndo`/`canRedo` flags and updating the toolbar to enable/disable undo/redo buttons accordingly.
+
+Generating patch (33 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/canvas_provider.dart)
+
+
+```
+
+```
+
+
+Generating patch (26 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/toolbar.dart)
+
+
+```
+
+```
+
+
+Completed: *Implement undo/redo (bonus)* (8/9)
+
+Undo/redo implemented and UI wired.
+
+Summary of changes:
+- `lib/providers/canvas_provider.dart`: added undo/redo stacks, `undoLast()` and `redo()` implementations, and `canUndo`/`canRedo` providers.
+- `lib/services/firebase_service.dart`: added `deleteStrokeById`.
+- `lib/widgets/toolbar.dart`: undo/redo buttons now enable/disable based on availability.
+
+Next steps I can take (pick one):
+- Render and allow transforming placed stickers on the canvas.
+- Add comments and polish code + README.
+- Improve presence visuals (names, labels).
+
+Which should I do next?
+
+Made changes.
+
+User: add comments, polish and finalize 
+
+GitHub Copilot: I'll add explanatory comments across core files, render stickers on the canvas, and update the README and todo status. Applying those edits now.
+
+Generating patch (56 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/main.dart)
+
+
+```
+
+```
+
+
+Generating patch (55 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/models/stroke.dart)
+
+
+```
+
+```
+
+
+Generating patch (17 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/models/sticker_model.dart)
+
+
+```
+
+```
+
+
+Generating patch (16 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/models/presence.dart)
+
+
+```
+
+```
+
+
+Generating patch (65 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/auth_service.dart)
+
+
+```
+
+```
+
+
+Generating patch (40 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+
+```
+
+```
+
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/canvas_widget.dart)
+
+Generating patch (87 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+
+```
+
+```
+
+
+Searched for text `deleteStrokeById(`, 3 results
+
+Read [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+Generating patch (14 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/services/firebase_service.dart)
+
+
+```
+
+```
+
+
+Generating patch (121 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/canvas_widget.dart)
+
+
+```
+
+```
+Now I'll add explanatory comments to providers, toolbar, participants indicator, and update README.
+
+Generating patch (59 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/providers/canvas_provider.dart)
+
+
+```
+
+```
+
+
+Generating patch (33 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/toolbar.dart)
+
+
+```
+
+```
+
+
+Generating patch (76 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/lib/widgets/participants_indicator.dart)
+
+
+```
+
+```
+
+
+Generating patch (40 lines) in [](file:///c%3A/Users/Tudor/OneDrive/SoftDev/Mobile_app/digital_graffiti_wall/README.md)
+
+
+```
+
+```
+
+
+Completed: *Add comments, polish and finalize* (9/9)
+
+Done — I added comments, polished code, rendered stickers on the canvas, and updated the README.
+
+What I changed (high level)
+- Added doc comments across core files: `main.dart`, models, services, providers, widgets.
+- Rendered placed stickers on the canvas as positioned widgets (`lib/widgets/canvas_widget.dart`).
+- Cleaned duplicate methods and added clarifying comments in `lib/services/firebase_service.dart`.
+- Wired undo/redo UI and exposed `canUndo` / `canRedo`.
+- Improved README with explicit Firebase setup and run steps.
+- Marked the todo list as completed.
+
+Files of interest
+- `lib/main.dart` — app entry + Firebase init
+- `lib/models/stroke.dart`, `sticker_model.dart`, `presence.dart` — data models with docs
+- `lib/services/firebase_service.dart`, `auth_service.dart` — Firebase wrappers with comments
+- `lib/providers/*.dart` — Riverpod providers and canvas undo/redo logic
+- `lib/widgets/canvas_widget.dart` — drawing, presence push, sticker placement, rendering
+- `lib/widgets/toolbar.dart` — toolbar, undo/redo, sticker picker
+- `lib/widgets/participants_indicator.dart` — visual presence dots
+- `README.md` — run & Firebase setup
+
+Next steps (optional)
+- Add transform handles for stickers (scale/rotate/drag).
+- Improve performance (throttle presence updates, batch strokes).
+- Add tests and CI setup.
+
+If you want, I can now:
+- Implement sticker transform UI, or
+- Add more in-file comments and type annotations, or
+- Prepare a short demo script and Firebase rules example.
+
+Which would you like next?
+
+Made changes.

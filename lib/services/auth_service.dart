@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 /// Lightweight auth wrapper used by the app.
@@ -12,14 +13,10 @@ class AuthInfo {
 }
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth? _auth = Firebase.apps.isNotEmpty ? FirebaseAuth.instance : null;
+  AuthInfo? _localAuthInfo;
 
-  /// Sign-in anonymously and return an [AuthInfo] with a deterministic
-  /// color value derived from the uid.
-  Future<AuthInfo> signInAnonymously() async {
-    final cred = await _auth.signInAnonymously();
-    final uid = cred.user!.uid;
-    // Generate a pleasant-looking color from uid hash.
+  AuthInfo _buildAuthInfo(String uid) {
     final seed = uid.hashCode;
     final r = Random(seed);
     final colorValue = 0xFF000000 |
@@ -29,5 +26,29 @@ class AuthService {
     return AuthInfo(uid, colorValue);
   }
 
-  String? get currentUid => _auth.currentUser?.uid;
+  AuthInfo? get cachedAuthInfo {
+    if (_auth != null) {
+      return _localAuthInfo;
+    }
+    return _localAuthInfo ??= _buildAuthInfo('local-user');
+  }
+
+  /// Sign-in anonymously and return an [AuthInfo] with a deterministic
+  /// color value derived from the uid.
+  Future<AuthInfo> signInAnonymously() async {
+    final auth = _auth;
+    if (auth == null) {
+      return _localAuthInfo ??= _buildAuthInfo('local-user');
+    }
+
+    try {
+      final cred = await auth.signInAnonymously();
+      final uid = cred.user!.uid;
+      return _buildAuthInfo(uid);
+    } catch (_) {
+      return _localAuthInfo ??= _buildAuthInfo('local-user');
+    }
+  }
+
+  String? get currentUid => _auth?.currentUser?.uid ?? _localAuthInfo?.uid;
 }

@@ -74,7 +74,11 @@ import 'widgets/canvas_widget.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Firebase is optional for local-only runs on a device.
+  }
   runApp(const ProviderScope(child: MyApp()));
 }
 

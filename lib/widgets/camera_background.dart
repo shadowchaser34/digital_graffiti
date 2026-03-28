@@ -1,25 +1,37 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+import '../models/poster_anchor.dart';
+import '../providers/poster_provider.dart';
+import '../services/poster_detection_service.dart';
 
 /// Renders the live camera feed and places an overlay widget on top of it.
 ///
 /// The widget is defensive: if camera permission is denied, no device camera
 /// is available, or the platform channel is unavailable in tests, it falls back
 /// to a non-white loading/error surface instead of crashing.
-class CameraBackground extends StatefulWidget {
+class CameraBackground extends ConsumerStatefulWidget {
   final Widget overlay;
 
   const CameraBackground({super.key, required this.overlay});
 
   @override
-  State<CameraBackground> createState() => _CameraBackgroundState();
+  ConsumerState<CameraBackground> createState() => _CameraBackgroundState();
 }
 
-class _CameraBackgroundState extends State<CameraBackground> {
+class _CameraBackgroundState extends ConsumerState<CameraBackground> {
   CameraController? _controller;
   String? _errorMessage;
   bool _permissionDenied = false;
+  PosterDetectionService? _detectionService;
+  bool _detectorReady = false;
+  bool _isProcessingFrame = false;
+  DateTime _lastFrameTick = DateTime.fromMillisecondsSinceEpoch(0);
+  String _detectorHint = 'Scan posterul pentru a-l ancora';
+  String? _candidatePosterId;
+  int _stableHits = 0;
 
   @override
   void initState() {
@@ -64,6 +76,21 @@ class _CameraBackgroundState extends State<CameraBackground> {
         _controller = controller;
         _errorMessage = null;
         _permissionDenied = false;
+        _detectorHint = 'Detector poster în pornire...';
+      });
+
+      _detectionService = PosterDetectionService(catalog: posterCatalog);
+      await _detectionService!.initialize();
+      _detectorReady = true;
+
+      await controller.startImageStream(_handleFrame);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _detectorHint = 'Arată un afiș din setul de referință';
       });
     } catch (error) {
       if (!mounted) return;
@@ -75,8 +102,68 @@ class _CameraBackgroundState extends State<CameraBackground> {
 
   @override
   void dispose() {
+    final controller = _controller;
+    if (controller != null && controller.value.isStreamingImages) {
+      controller.stopImageStream();
+    }
     _controller?.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleFrame(CameraImage image) async {
+    if (!_detectorReady || _isProcessingFrame) {
+      return;
+    }
+
+    final now = DateTime.now();
+    if (now.difference(_lastFrameTick).inMilliseconds < 220) {
+      return;
+    }
+
+    _isProcessingFrame = true;
+    _lastFrameTick = now;
+
+    try {
+      final detection = await _detectionService?.detect(image);
+      if (detection == null) {
+        if (mounted) {
+          setState(() {
+            _detectorHint = 'Scanare poster...';
+          });
+        }
+        _candidatePosterId = null;
+        _stableHits = 0;
+        return;
+      }
+
+      if (detection.poster.id == _candidatePosterId) {
+        _stableHits += 1;
+      } else {
+        _candidatePosterId = detection.poster.id;
+        _stableHits = 1;
+      }
+
+      if (mounted) {
+        setState(() {
+          _detectorHint = '${detection.poster.name} · scor ${detection.score.toStringAsFixed(3)}';
+        });
+      }
+
+      if (_stableHits >= 2) {
+        final activePoster = ref.read(activePosterProvider);
+        if (activePoster.id != detection.poster.id) {
+          ref.read(activePosterProvider.notifier).state = detection.poster;
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _detectorHint = 'Detector poster temporar indisponibil';
+        });
+      }
+    } finally {
+      _isProcessingFrame = false;
+    }
   }
 
   @override
@@ -114,6 +201,29 @@ class _CameraBackgroundState extends State<CameraBackground> {
       children: [
         cameraPreview,
         Positioned.fill(child: widget.overlay),
+        Positioned(
+          top: 16,
+          left: 16,
+          right: 16,
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                ),
+                child: Text(
+                  _errorMessage ?? _detectorHint,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

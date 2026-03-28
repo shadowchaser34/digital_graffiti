@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/brush_type.dart';
 import '../models/stroke.dart';
 import '../models/sticker_model.dart';
-import '../providers/canvas_provider.dart';
-import '../providers/brush_provider.dart';
-import '../providers/sticker_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/brush_provider.dart';
+import '../providers/canvas_provider.dart';
 import '../providers/poster_provider.dart';
+import '../providers/sticker_provider.dart';
 import '../utils/poster_layout.dart';
 
 class CanvasWidget extends ConsumerStatefulWidget {
@@ -19,55 +23,88 @@ class CanvasWidget extends ConsumerStatefulWidget {
 class _CanvasWidgetState extends ConsumerState<CanvasWidget> {
   List<Offset> _currentPoints = [];
 
-  void _start(Offset pt, Rect posterRect) {
-    if (!posterContainsLocal(pt, posterRect)) {
+  void _start(Offset point, Rect posterRect) {
+    if (!posterContainsLocal(point, posterRect)) {
       return;
     }
 
     final poster = ref.read(activePosterProvider);
+    final normalized = posterLocalToNormalized(point, posterRect);
+    final auth = ref.read(authInfoProvider);
+
     setState(() {
-      _currentPoints = [posterLocalToNormalized(pt, posterRect)];
+      _currentPoints = [normalized];
     });
-    final normalized = posterLocalToNormalized(pt, posterRect);
-    final auth = ref.read(authInfoProvider)!;
-    ref.read(canvasProvider(poster.id).notifier).setPresence(normalized.dx, normalized.dy, true, auth.colorValue);
+
+    if (auth != null) {
+      ref.read(canvasProvider(poster.id).notifier).setPresence(
+            normalized.dx,
+            normalized.dy,
+            true,
+            auth.colorValue,
+          );
+    }
   }
 
-  void _update(Offset pt, Rect posterRect) {
-    if (!posterContainsLocal(pt, posterRect) || _currentPoints.isEmpty) {
+  void _update(Offset point, Rect posterRect) {
+    if (!posterContainsLocal(point, posterRect) || _currentPoints.isEmpty) {
       return;
     }
 
     final poster = ref.read(activePosterProvider);
+    final normalized = posterLocalToNormalized(point, posterRect);
+    final auth = ref.read(authInfoProvider);
+
     setState(() {
-      _currentPoints.add(posterLocalToNormalized(pt, posterRect));
+      _currentPoints.add(normalized);
     });
-    final normalized = posterLocalToNormalized(pt, posterRect);
-    final auth = ref.read(authInfoProvider)!;
-    ref.read(canvasProvider(poster.id).notifier).setPresence(normalized.dx, normalized.dy, true, auth.colorValue);
+
+    if (auth != null) {
+      ref.read(canvasProvider(poster.id).notifier).setPresence(
+            normalized.dx,
+            normalized.dy,
+            true,
+            auth.colorValue,
+          );
+    }
   }
 
-  void _end(Rect posterRect) async {
+  Future<void> _end() async {
+    if (_currentPoints.isEmpty) {
+      return;
+    }
+
     final poster = ref.read(activePosterProvider);
     final svc = ref.read(firebaseServiceProvider);
-    final auth = ref.read(authInfoProvider)!;
+    final auth = ref.read(authInfoProvider);
+    if (auth == null) {
+      setState(() {
+        _currentPoints = [];
+      });
+      return;
+    }
+
     final brush = ref.read(brushSettingsProvider);
-    final id = svc.generateId();
     final stroke = Stroke(
-      id: id,
+      id: svc.generateId(),
       userId: auth.uid,
       posterId: poster.id,
-      points: _currentPoints,
+      points: List<Offset>.from(_currentPoints),
       color: brush.color,
       thickness: brush.thickness,
+      brushType: BrushType.pen,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
+
     await ref.read(canvasProvider(poster.id).notifier).addStrokeLocalAndRemote(stroke);
+    ref.read(canvasProvider(poster.id).notifier).setPresence(0.5, 0.5, false, auth.colorValue);
+
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _currentPoints = [];
     });
-    // notify presence stopped
-    ref.read(canvasProvider(poster.id).notifier).setPresence(0.5, 0.5, false, auth.colorValue);
   }
 
   @override
@@ -85,33 +122,34 @@ class _CanvasWidgetState extends ConsumerState<CanvasWidget> {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTapUp: (e) async {
+          onTapUp: (details) async {
             final isPlacing = ref.read(isPlacingStickerProvider);
             final selected = ref.read(selectedStickerProvider);
-            if (isPlacing && selected != null && posterContainsLocal(e.localPosition, posterRect)) {
+            if (isPlacing && selected != null && posterContainsLocal(details.localPosition, posterRect)) {
               final svc = ref.read(firebaseServiceProvider);
-              final auth = ref.read(authInfoProvider)!;
-              final id = svc.generateId();
-              final normalized = posterLocalToNormalized(e.localPosition, posterRect);
-              final st = StickerModel(
-                id: id,
-                userId: auth.uid,
-                posterId: poster.id,
-                imageUrl: selected,
-                x: normalized.dx,
-                y: normalized.dy,
-                scale: 1.0,
-                rotation: 0.0,
-                timestamp: DateTime.now().millisecondsSinceEpoch,
-              );
-              await ref.read(canvasProvider(poster.id).notifier).addSticker(st);
-              ref.read(isPlacingStickerProvider.notifier).state = false;
-              ref.read(selectedStickerProvider.notifier).state = null;
+              final auth = ref.read(authInfoProvider);
+              if (auth != null) {
+                final normalized = posterLocalToNormalized(details.localPosition, posterRect);
+                final sticker = StickerModel(
+                  id: svc.generateId(),
+                  userId: auth.uid,
+                  posterId: poster.id,
+                  imageUrl: selected,
+                  x: normalized.dx,
+                  y: normalized.dy,
+                  scale: 1.0,
+                  rotation: 0.0,
+                  timestamp: DateTime.now().millisecondsSinceEpoch,
+                );
+                await ref.read(canvasProvider(poster.id).notifier).addSticker(sticker);
+                ref.read(isPlacingStickerProvider.notifier).state = false;
+                ref.read(selectedStickerProvider.notifier).state = null;
+              }
             }
           },
-          onPanStart: (e) => _start(e.localPosition, posterRect),
-          onPanUpdate: (e) => _update(e.localPosition, posterRect),
-          onPanEnd: (e) => _end(posterRect),
+          onPanStart: (details) => _start(details.localPosition, posterRect),
+          onPanUpdate: (details) => _update(details.localPosition, posterRect),
+          onPanEnd: (_) => unawaited(_end()),
           child: SizedBox.expand(
             child: Stack(
               children: [
@@ -126,30 +164,30 @@ class _CanvasWidgetState extends ConsumerState<CanvasWidget> {
                     ),
                   ),
                 ),
-                ...canvasState.stickers.map((st) {
-                  final stickerCenter = posterNormalizedToLocal(Offset(st.x, st.y), posterRect);
-                  final left = stickerCenter.dx - (32 * st.scale);
-                  final top = stickerCenter.dy - (32 * st.scale);
+                ...canvasState.stickers.map((sticker) {
+                  final center = posterNormalizedToLocal(Offset(sticker.x, sticker.y), posterRect);
+                  final left = center.dx - (32 * sticker.scale);
+                  final top = center.dy - (32 * sticker.scale);
                   return Positioned(
                     left: left.clamp(posterRect.left, posterRect.right - 8.0),
                     top: top.clamp(posterRect.top, posterRect.bottom - 8.0),
                     child: Transform.rotate(
-                      angle: st.rotation,
+                      angle: sticker.rotation,
                       child: Image.network(
-                        st.imageUrl,
-                        width: 64 * st.scale,
-                        height: 64 * st.scale,
+                        sticker.imageUrl,
+                        width: 64 * sticker.scale,
+                        height: 64 * sticker.scale,
                         fit: BoxFit.contain,
-                        errorBuilder: (c, e, s) => Container(
-                          width: 64 * st.scale,
-                          height: 64 * st.scale,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 64 * sticker.scale,
+                          height: 64 * sticker.scale,
                           color: Colors.grey.shade300,
                           child: const Icon(Icons.broken_image),
                         ),
                       ),
                     ),
                   );
-                }).toList(),
+                }),
                 Positioned(
                   left: posterRect.left,
                   top: posterRect.top - 28,
@@ -205,6 +243,59 @@ class _GraffitiPainter extends CustomPainter {
     required this.brushThickness,
   });
 
+  Paint _paintForStroke(Stroke stroke) {
+    switch (stroke.brushType) {
+      case BrushType.marker:
+        return Paint()
+          ..color = stroke.color.withOpacity(0.68)
+          ..strokeWidth = stroke.thickness * 1.35
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke
+          ..isAntiAlias = true;
+      case BrushType.calligraphy:
+        return Paint()
+          ..color = stroke.color
+          ..strokeWidth = stroke.thickness * 1.2
+          ..strokeCap = StrokeCap.square
+          ..style = PaintingStyle.stroke
+          ..isAntiAlias = true;
+      case BrushType.neon:
+        return Paint()
+          ..color = stroke.color.withOpacity(0.82)
+          ..strokeWidth = stroke.thickness * 1.6
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4)
+          ..isAntiAlias = true;
+      case BrushType.pen:
+        return Paint()
+          ..color = stroke.color
+          ..strokeWidth = stroke.thickness
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke
+          ..isAntiAlias = true;
+    }
+  }
+
+  void _drawStroke(Canvas canvas, Size size, List<Offset> points, Paint paint) {
+    if (points.length < 2) {
+      return;
+    }
+
+    final path = Path();
+    path.moveTo(
+      posterRect.left + points.first.dx * posterRect.width,
+      posterRect.top + points.first.dy * posterRect.height,
+    );
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(
+        posterRect.left + points[i].dx * posterRect.width,
+        posterRect.top + points[i].dy * posterRect.height,
+      );
+    }
+    canvas.drawPath(path, paint);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final fillPaint = Paint()..color = Colors.white.withValues(alpha: 0.06);
@@ -212,9 +303,6 @@ class _GraffitiPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..color = Colors.white.withValues(alpha: 0.35)
       ..strokeWidth = 1.4;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(posterRect, const Radius.circular(16)),
@@ -228,45 +316,29 @@ class _GraffitiPainter extends CustomPainter {
     canvas.save();
     canvas.clipRRect(RRect.fromRectAndRadius(posterRect, const Radius.circular(16)));
 
-    for (final s in strokes) {
-      paint.color = s.color;
-      paint.strokeWidth = s.thickness;
-      final path = Path();
-      if (s.points.isNotEmpty) {
-        path.moveTo(
-          posterRect.left + s.points.first.dx * posterRect.width,
-          posterRect.top + s.points.first.dy * posterRect.height,
-        );
-        for (var i = 1; i < s.points.length; i++) {
-          path.lineTo(
-            posterRect.left + s.points[i].dx * posterRect.width,
-            posterRect.top + s.points[i].dy * posterRect.height,
-          );
-        }
-        canvas.drawPath(path, paint);
-      }
+    for (final stroke in strokes) {
+      _drawStroke(canvas, size, stroke.points, _paintForStroke(stroke));
     }
 
     if (currentPoints.isNotEmpty) {
-      paint.color = brushColor;
-      paint.strokeWidth = brushThickness;
-      final path = Path();
-      path.moveTo(
-        posterRect.left + currentPoints.first.dx * posterRect.width,
-        posterRect.top + currentPoints.first.dy * posterRect.height,
-      );
-      for (var i = 1; i < currentPoints.length; i++) {
-        path.lineTo(
-          posterRect.left + currentPoints[i].dx * posterRect.width,
-          posterRect.top + currentPoints[i].dy * posterRect.height,
-        );
-      }
-      canvas.drawPath(path, paint);
+      final paint = Paint()
+        ..color = brushColor
+        ..strokeWidth = brushThickness
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke
+        ..isAntiAlias = true;
+      _drawStroke(canvas, size, currentPoints, paint);
     }
 
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _GraffitiPainter oldDelegate) {
+    return oldDelegate.strokes != strokes ||
+        oldDelegate.currentPoints != currentPoints ||
+        oldDelegate.posterRect != posterRect ||
+        oldDelegate.brushColor != brushColor ||
+        oldDelegate.brushThickness != brushThickness;
+  }
 }

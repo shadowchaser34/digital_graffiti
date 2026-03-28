@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:uuid/uuid.dart';
+import '../models/poster_catalog.dart';
 import '../models/stroke.dart';
 import '../models/sticker_model.dart';
 import '../models/presence.dart';
@@ -9,9 +10,9 @@ import '../models/presence.dart';
 class FirebaseService {
   final FirebaseFirestore? _fs = Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null;
   final _uuid = const Uuid();
-  final List<Stroke> _localStrokes = [];
-  final List<StickerModel> _localStickers = [];
-  final List<Presence> _localPresence = [];
+  final Map<String, List<Stroke>> _localStrokesByPoster = {};
+  final Map<String, List<StickerModel>> _localStickersByPoster = {};
+  final Map<String, List<Presence>> _localPresenceByPoster = {};
   final StreamController<void> _strokeUpdates = StreamController<void>.broadcast();
   final StreamController<void> _stickerUpdates = StreamController<void>.broadcast();
   final StreamController<void> _presenceUpdates = StreamController<void>.broadcast();
@@ -21,60 +22,47 @@ class FirebaseService {
     final fs = _fs;
     if (fs == null) {
       return Stream<List<Stroke>>.multi((controller) {
-        controller.add(List.unmodifiable(
-          _localStrokes.where((stroke) => stroke.posterId == posterId),
-        ));
+        controller.add(List.unmodifiable(_localStrokesByPoster[posterId] ?? const []));
         final sub = _strokeUpdates.stream.listen((_) {
-          controller.add(List.unmodifiable(
-            _localStrokes.where((stroke) => stroke.posterId == posterId),
-          ));
+          controller.add(List.unmodifiable(_localStrokesByPoster[posterId] ?? const []));
         });
         controller.onCancel = sub.cancel;
       });
     }
 
-    return fs.collection('strokes').where('posterId', isEqualTo: posterId).snapshots().map(
-      (snap) {
-        final strokes = snap.docs.map((d) => Stroke.fromMap(d.data())).toList();
-        strokes.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-        return strokes;
-      },
-    );
+    return fs.collection('strokes').where('posterId', isEqualTo: posterId).snapshots().map((snap) {
+      final strokes = snap.docs.map((d) => Stroke.fromMap(d.data())).toList();
+      strokes.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return strokes;
+    });
   }
 
   Stream<List<StickerModel>> stickersStream({required String posterId}) {
     final fs = _fs;
     if (fs == null) {
       return Stream<List<StickerModel>>.multi((controller) {
-        controller.add(List.unmodifiable(
-          _localStickers.where((sticker) => sticker.posterId == posterId),
-        ));
+        controller.add(List.unmodifiable(_localStickersByPoster[posterId] ?? const []));
         final sub = _stickerUpdates.stream.listen((_) {
-          controller.add(List.unmodifiable(
-            _localStickers.where((sticker) => sticker.posterId == posterId),
-          ));
+          controller.add(List.unmodifiable(_localStickersByPoster[posterId] ?? const []));
         });
         controller.onCancel = sub.cancel;
       });
     }
 
-    return fs.collection('stickers').where('posterId', isEqualTo: posterId).snapshots().map(
-      (snap) {
-        final stickers = snap.docs.map((d) => StickerModel.fromMap(d.data())).toList();
-        stickers.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-        return stickers;
-      },
-    );
+    return fs.collection('stickers').where('posterId', isEqualTo: posterId).snapshots().map((snap) {
+      final stickers = snap.docs.map((d) => StickerModel.fromMap(d.data())).toList();
+      stickers.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      return stickers;
+    });
   }
   /// Set presence document for a single user.
   /// Presence documents are small and updated frequently.
   Future<void> setPresence(Presence p) async {
     final fs = _fs;
     if (fs == null) {
-      _localPresence.removeWhere(
-        (existing) => existing.userId == p.userId && existing.posterId == p.posterId,
-      );
-      _localPresence.add(p);
+      final list = _localPresenceByPoster.putIfAbsent(p.posterId, () => []);
+      list.removeWhere((existing) => existing.userId == p.userId);
+      list.add(p);
       _presenceUpdates.add(null);
       return;
     }
@@ -88,32 +76,27 @@ class FirebaseService {
     final fs = _fs;
     if (fs == null) {
       return Stream<List<Presence>>.multi((controller) {
-        controller.add(List.unmodifiable(
-          _localPresence.where((presence) => presence.posterId == posterId),
-        ));
+        controller.add(List.unmodifiable(_localPresenceByPoster[posterId] ?? const []));
         final sub = _presenceUpdates.stream.listen((_) {
-          controller.add(List.unmodifiable(
-            _localPresence.where((presence) => presence.posterId == posterId),
-          ));
+          controller.add(List.unmodifiable(_localPresenceByPoster[posterId] ?? const []));
         });
         controller.onCancel = sub.cancel;
       });
     }
 
-    return fs.collection('presence').where('posterId', isEqualTo: posterId).snapshots().map(
-      (snap) {
-        final presence = snap.docs.map((d) => Presence.fromMap(d.data())).toList();
-        presence.sort((a, b) => b.lastActive.compareTo(a.lastActive));
-        return presence;
-      },
-    );
+    return fs.collection('presence').where('posterId', isEqualTo: posterId).snapshots().map((snap) {
+      final presence = snap.docs.map((d) => Presence.fromMap(d.data())).toList();
+      presence.sort((a, b) => b.lastActive.compareTo(a.lastActive));
+      return presence;
+    });
   }
 
   Future<void> addStroke(Stroke s) async {
     final fs = _fs;
     if (fs == null) {
-      _localStrokes.removeWhere((existing) => existing.id == s.id);
-      _localStrokes.add(s);
+      final list = _localStrokesByPoster.putIfAbsent(s.posterId, () => []);
+      list.removeWhere((existing) => existing.id == s.id);
+      list.add(s);
       _strokeUpdates.add(null);
       return;
     }
@@ -126,7 +109,9 @@ class FirebaseService {
   Future<void> deleteStrokeById(String id) async {
     final fs = _fs;
     if (fs == null) {
-      _localStrokes.removeWhere((existing) => existing.id == id);
+      for (final list in _localStrokesByPoster.values) {
+        list.removeWhere((existing) => existing.id == id);
+      }
       _strokeUpdates.add(null);
       return;
     }
@@ -138,8 +123,9 @@ class FirebaseService {
   Future<void> addSticker(StickerModel st) async {
     final fs = _fs;
     if (fs == null) {
-      _localStickers.removeWhere((existing) => existing.id == st.id);
-      _localStickers.add(st);
+      final list = _localStickersByPoster.putIfAbsent(st.posterId, () => []);
+      list.removeWhere((existing) => existing.id == st.id);
+      list.add(st);
       _stickerUpdates.add(null);
       return;
     }
@@ -149,15 +135,16 @@ class FirebaseService {
   }
 
   // Per-user undo: delete latest stroke by user
-  Future<void> undoLastStrokeByUser(String userId, {String posterId = 'default-poster'}) async {
+  Future<void> undoLastStrokeByUser(String userId, {String posterId = defaultPosterId}) async {
     final fs = _fs;
     if (fs == null) {
-      final index = _localStrokes.lastIndexWhere(
-        (stroke) => stroke.userId == userId && stroke.posterId == posterId,
-      );
-      if (index >= 0) {
-        _localStrokes.removeAt(index);
-        _strokeUpdates.add(null);
+      final list = _localStrokesByPoster[posterId];
+      if (list != null) {
+        final index = list.lastIndexWhere((stroke) => stroke.userId == userId);
+        if (index >= 0) {
+          list.removeAt(index);
+          _strokeUpdates.add(null);
+        }
       }
       return;
     }

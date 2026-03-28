@@ -19,3 +19,13 @@ Output organization:
 Documentation expectations:
 1. New code should include docstrings or short comments only where behavior is not obvious.
 2. Keep comments concise and tied to implementation intent, not trivial line-by-line narration.
+
+Definition of Done (Sprint-level):
+1. Requested feature or fix is implemented and scoped to the sprint goal.
+2. Targeted validation was executed and reported.
+3. No leftover references to deprecated `alpha` variants remain in touched files.
+4. Handoff report includes files changed, validation performed, and any blockers.
+
+Mandatory Alpha Gate:
+1. Before marking sprint done, run an explicit `alpha` leftover check on touched files.
+2. If any `alpha` leftovers are found in touched scope, sprint status is not done until cleanup is completed or the user explicitly approves deferral.

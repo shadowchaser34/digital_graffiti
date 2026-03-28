@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'brush_type.dart';
+import 'poster_catalog.dart';
 
 /// Stroke represents a single freehand path drawn by a user.
 ///
@@ -12,15 +14,17 @@ class Stroke {
   final List<Offset> points;
   final Color color;
   final double thickness;
+  final BrushType brushType;
   final int timestamp;
 
   Stroke({
     required this.id,
     required this.userId,
-    this.posterId = 'default-poster',
+    this.posterId = defaultPosterId,
     required this.points,
     required this.color,
     required this.thickness,
+    required this.brushType,
     required this.timestamp,
   });
 
@@ -32,6 +36,7 @@ class Stroke {
         'points': points.map((p) => {'x': p.dx, 'y': p.dy}).toList(),
         'color': color.value,
         'thickness': thickness,
+        'brushType': brushType.id,
         'timestamp': timestamp,
       };
 
@@ -48,10 +53,11 @@ class Stroke {
     return Stroke(
       id: m['id'] as String,
       userId: m['userId'] as String,
-      posterId: (m['posterId'] as String?) ?? 'default-poster',
+      posterId: (m['posterId'] as String?) ?? defaultPosterId,
       points: pts,
       color: Color((m['color'] as int)),
       thickness: (m['thickness'] as num).toDouble(),
+      brushType: brushTypeFromId(m['brushType'] as String?),
       timestamp: (m['timestamp'] as int),
     );
   }

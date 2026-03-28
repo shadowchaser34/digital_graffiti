@@ -86,7 +86,6 @@ class CanvasNotifier extends StateNotifier<CanvasState> {
     _stkrSub = _svc.stickersStream(posterId: _posterId).listen((list) {
       state = state.copyWith(stickers: list);
     });
-    // subscribe to presence
     _presenceSub = _svc.presenceStream(posterId: _posterId).listen((list) {
       state = state.copyWith(presence: list);
     });

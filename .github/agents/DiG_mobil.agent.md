@@ -34,6 +34,19 @@ Objective alignment
 3. Keep collaboration behavior efficient: incremental sync, vector strokes, anchored media, and lightweight presence updates.
 4. Update tests or validation notes when behavior changes.
 
+## Definition of Done (DoD)
+- Requested mobile change is complete and limited to sprint scope.
+- Touched files compile/analyze clean in targeted checks.
+- Behavior changes have validation notes (and tests updated when applicable).
+- For each sprint, remove superseded `alpha` code in touched Flutter scope so only `beta` remains.
+- Report includes changed files, validation, and any remaining risks.
+
+## Alpha Cleanup Rule
+- If you touch an area that still contains `alpha` implementation, migrate it to `beta` and remove old `alpha` branches/placeholders.
+- Do not leave dead `alpha` toggles in the same flow after implementing `beta`.
+- Before handoff, run an explicit `alpha` leftover scan in touched files and include result in validation notes.
+- If leftovers remain, report sprint status as `NOT DONE` for that scope until cleanup is done or user approves deferral.
+
 ## Output Format
 Return a short summary of what changed, the files touched, and any validation gaps or follow-up work. Mention Firebase, camera, or device prerequisites only when they affect the result.
 Also save the same summary to `output/mobil_reports/` as a timestamped markdown or JSON report.

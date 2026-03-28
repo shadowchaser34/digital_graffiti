@@ -1,3 +1,5 @@
+import 'poster_catalog.dart';
+
 /// Presence describes a user's pointer position and drawing state on the canvas.
 ///
 /// `x`/`y` are normalized coordinates (0..1) relative to the poster view.
@@ -13,7 +15,7 @@ class Presence {
 
   Presence({
     required this.userId,
-    this.posterId = 'default-poster',
+    this.posterId = defaultPosterId,
     required this.x,
     required this.y,
     required this.isDrawing,
@@ -33,7 +35,7 @@ class Presence {
 
   factory Presence.fromMap(Map<String, dynamic> m) => Presence(
         userId: m['userId'] as String,
-      posterId: (m['posterId'] as String?) ?? 'default-poster',
+      posterId: (m['posterId'] as String?) ?? defaultPosterId,
         x: (m['x'] as num).toDouble(),
         y: (m['y'] as num).toDouble(),
         isDrawing: m['isDrawing'] as bool,

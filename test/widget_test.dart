@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:digital_graffiti_wall/main.dart';
 import 'package:digital_graffiti_wall/screens/home_screen.dart';
 

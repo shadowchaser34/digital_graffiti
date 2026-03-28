@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../models/poster_anchor.dart';
 import '../providers/brush_provider.dart';
 import '../providers/canvas_provider.dart';
@@ -8,12 +9,13 @@ import '../providers/sticker_provider.dart';
 
 class ToolBar extends ConsumerWidget {
   const ToolBar({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Compact toolbar with poster-scoped drawing controls.
     final poster = ref.watch(activePosterProvider);
     final canvasState = ref.watch(canvasProvider(poster.id));
     final brush = ref.watch(brushSettingsProvider);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -24,12 +26,16 @@ class ToolBar extends ConsumerWidget {
           children: [
             IconButton(
               tooltip: 'Undo',
-              onPressed: canvasState.canUndo ? () async => await ref.read(canvasProvider(poster.id).notifier).undoLast() : null,
+              onPressed: canvasState.canUndo
+                  ? () async => await ref.read(canvasProvider(poster.id).notifier).undoLast()
+                  : null,
               icon: const Icon(Icons.undo),
             ),
             IconButton(
               tooltip: 'Redo',
-              onPressed: canvasState.canRedo ? () async => await ref.read(canvasProvider(poster.id).notifier).redo() : null,
+              onPressed: canvasState.canRedo
+                  ? () async => await ref.read(canvasProvider(poster.id).notifier).redo()
+                  : null,
               icon: const Icon(Icons.redo),
             ),
             IconButton(
@@ -165,12 +171,18 @@ class ToolBar extends ConsumerWidget {
                       ListTile(
                         leading: const Icon(Icons.emoji_emotions),
                         title: const Text('Heart sticker'),
-                        onTap: () => Navigator.pop(context, 'https://upload.wikimedia.org/wikipedia/commons/1/15/Red_heart.svg'),
+                        onTap: () => Navigator.pop(
+                          context,
+                          'https://upload.wikimedia.org/wikipedia/commons/1/15/Red_heart.svg',
+                        ),
                       ),
                       ListTile(
                         leading: const Icon(Icons.emoji_emotions),
                         title: const Text('Star sticker'),
-                        onTap: () => Navigator.pop(context, 'https://upload.wikimedia.org/wikipedia/commons/4/44/Plain_Yellow_Star.svg'),
+                        onTap: () => Navigator.pop(
+                          context,
+                          'https://upload.wikimedia.org/wikipedia/commons/4/44/Plain_Yellow_Star.svg',
+                        ),
                       ),
                     ],
                   ),

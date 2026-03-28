@@ -1,3 +1,5 @@
+import 'poster_catalog.dart';
+
 /// Represents a placed sticker on the shared canvas.
 ///
 /// `x` and `y` are normalized (0..1) coordinates relative to the poster view.
@@ -15,7 +17,7 @@ class StickerModel {
   StickerModel({
     required this.id,
     required this.userId,
-    this.posterId = 'default-poster',
+    this.posterId = defaultPosterId,
     required this.imageUrl,
     required this.x,
     required this.y,
@@ -39,7 +41,7 @@ class StickerModel {
   factory StickerModel.fromMap(Map<String, dynamic> m) => StickerModel(
         id: m['id'] as String,
         userId: m['userId'] as String,
-      posterId: (m['posterId'] as String?) ?? 'default-poster',
+      posterId: (m['posterId'] as String?) ?? defaultPosterId,
         imageUrl: m['imageUrl'] as String,
         x: (m['x'] as num).toDouble(),
         y: (m['y'] as num).toDouble(),

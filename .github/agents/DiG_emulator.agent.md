@@ -13,6 +13,8 @@ Beta workflow
 - Validate the exact sprint-1 change set that `DiG_mobil` delivered.
 - Prefer emulator or connected-device checks that directly prove the task is done.
 - Write a concise validation report to `output/emulator_reports/` every time you run a validation task.
+- Include log sections in the report using `info`, `debug`, `warning`, and `error` labels.
+- Add brief comments only when needed to document tricky validation assumptions or environment constraints.
 
 ## Constraints
 - Prioritize workflows that can be validated on an Android emulator or a connected Android device.
@@ -31,3 +33,4 @@ Beta workflow
 ## Output Format
 Return a concise report with the issue found, the fix applied, and the exact validation performed. Include any missing device, camera, or Firebase setup that blocks a full run.
 Also save the same validation report to `output/emulator_reports/` as a timestamped markdown or JSON file.
+Append a structured log section with `info`, `debug`, `warning`, and `error` entries when applicable.

@@ -12,6 +12,12 @@ Purpose
 - Ensure both subagents use consistent constraints, do not conflict, and report back clear results.
 - Run work in beta sprint slices: small implement -> validate -> report cycles.
 
+Definition of Done by Sprint
+- Sprint task is only complete when the requested files are updated, the relevant validation is run, and a report is saved in the correct `output/` subfolder.
+- Sprint 1 DoD: poster anchor model exists, canvas is poster-scoped, and core smoke tests pass.
+- Sprint 2 DoD: poster-scoped drawing, sticker placement, undo/redo, and real-time sync are verified.
+- Sprint 3 DoD: camera or device-facing poster flow, territory, and audio trigger behavior are validated.
+
 Coordination Rules
 - Always inspect code and current tasks before delegating. Use `read` and `search` to gather context.
 - Prefer `DiG_mobil` for code-first tasks (UI, providers, models, services, tests).
@@ -27,6 +33,8 @@ Reporting and Handoff
 - Require each subagent to produce a short report with: summary, files changed (paths), reason for change, and follow-up actions.
 - Require each subagent to save its report in the workspace output folder using separate subdirectories: `output/mobil_reports/` for `DiG_mobil` and `output/emulator_reports/` for `DiG_emulator`.
 - Prefer timestamped filenames so test runs and implementation runs do not overwrite each other.
+- Require every report to include log entries grouped by level: `info`, `debug`, `warning`, `error`.
+- Treat the log section as part of the sprint evidence: it must list what was attempted, what passed, what was skipped, and what blocked completion.
 - Merge reports into a single action plan for the user and update the project TODO list via `manage_todo_list` where appropriate.
 
 When to invoke subagents (examples)

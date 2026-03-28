@@ -14,3 +14,8 @@ Output organization:
 1. `output/mobil_reports/` stores implementation reports from `DiG_mobil`.
 2. `output/emulator_reports/` stores validation reports from `DiG_emulator`.
 3. Use timestamped filenames to keep sprint evidence traceable.
+4. Reports should include structured log sections with `info`, `debug`, `warning`, and `error` entries.
+
+Documentation expectations:
+1. New code should include docstrings or short comments only where behavior is not obvious.
+2. Keep comments concise and tied to implementation intent, not trivial line-by-line narration.

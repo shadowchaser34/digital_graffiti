@@ -43,3 +43,9 @@ Use this checklist to track completion of each milestone and required verificati
 ## Notes
 - For each checklist item include: files changed, tests run, and any manual validation steps.
 - Use `docs/project_definition/poze` as the canonical poster-anchoring reference set during implementation and testing.
+
+## Definition of Done for Each Sprint
+- The sprint is only done if the code compiles, the relevant tests pass, and the implementation report is saved under the correct `output/` subfolder.
+- The report must include a log section with `info`, `debug`, `warning`, and `error` entries.
+- The implementation should include short docstrings or comments for new code only when the intent is not obvious.
+- A sprint cannot close if the targeted user flow is unvalidated on emulator or device.

@@ -13,6 +13,8 @@ Beta workflow
 - Work in small sprint-1 increments only when `DiG_dev` assigns them.
 - Keep changes focused and testable so `DiG_emulator` can validate them immediately after implementation.
 - When finishing a task, write a concise implementation report to `output/mobil_reports/` with files changed, reason, and any validation notes.
+- Include log sections in the report using `info`, `debug`, `warning`, and `error` labels.
+- Add short docstrings or inline comments for any new code only where the flow is not self-explanatory.
 
 Objective alignment
 - Prioritize poster-anchored AR workflows, collaborative canvas state, and synchronized media placed on the same anchor.
@@ -35,3 +37,4 @@ Objective alignment
 ## Output Format
 Return a short summary of what changed, the files touched, and any validation gaps or follow-up work. Mention Firebase, camera, or device prerequisites only when they affect the result.
 Also save the same summary to `output/mobil_reports/` as a timestamped markdown or JSON report.
+Append a structured log section with `info`, `debug`, `warning`, and `error` entries when applicable.

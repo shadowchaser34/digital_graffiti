@@ -1,3 +1,122 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:camera/camera.dart';
+import 'package:flutter/services.dart';
+
+import '../models/poster_anchor.dart';
+
+/// Result of comparing a camera frame against the poster reference catalog.
+class PosterDetectionResult {
+  final PosterAnchor poster;
+  final double score;
+
+  const PosterDetectionResult({required this.poster, required this.score});
+}
+
+class _PosterTemplate {
+  final PosterAnchor poster;
+  final List<int> pixels;
+
+  const _PosterTemplate({required this.poster, required this.pixels});
+}
+
+/// Lightweight poster detector that matches live camera frames against the
+/// poster reference images bundled in the app.
+class PosterDetectionService {
+  final List<PosterAnchor> catalog;
+  final int sampleWidth;
+  final int sampleHeight;
+
+  PosterDetectionService({
+    required this.catalog,
+    this.sampleWidth = 48,
+    this.sampleHeight = 68,
+  });
+
+  final List<_PosterTemplate> _templates = [];
+  bool _initialized = false;
+
+  Future<void> initialize() async {
+    if (_initialized) {
+      return;
+    }
+
+    for (final poster in catalog) {
+      final bytes = await rootBundle.load(poster.referenceImagePath);
+      final pixels = await _grayscaleFromPngBytes(bytes.buffer.asUint8List());
+      _templates.add(_PosterTemplate(poster: poster, pixels: pixels));
+    }
+
+    _initialized = true;
+  }
+
+  Future<PosterDetectionResult?> detect(CameraImage image) async {
+    if (!_initialized) {
+      await initialize();
+    }
+
+    final framePixels = _grayscaleFromCameraImage(image);
+    if (framePixels.isEmpty) {
+      return null;
+    }
+
+    PosterDetectionResult? best;
+    var bestScore = double.infinity;
+    var secondBestScore = double.infinity;
+
+    for (final template in _templates) {
+      final score = _meanAbsoluteDifference(framePixels, template.pixels);
+      if (score < bestScore) {
+        secondBestScore = bestScore;
+        bestScore = score;
+        best = PosterDetectionResult(poster: template.poster, score: score);
+      } else if (score < secondBestScore) {
+        secondBestScore = score;
+      }
+    }
+
+    // Heuristic: accept only if best is much better than second best
+    if (best != null && bestScore < 0.7 * secondBestScore) {
+      return best;
+    }
+    return null;
+  }
+
+  static Future<List<int>> _grayscaleFromPngBytes(Uint8List bytes) async {
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 48, targetHeight: 68);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final pixels = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (pixels == null) return [];
+    return _grayscaleFromRgba(pixels.buffer.asUint8List());
+  }
+
+  static List<int> _grayscaleFromCameraImage(CameraImage image) {
+    // TODO: implement conversion from CameraImage to grayscale sample
+    return [];
+  }
+
+  static List<int> _grayscaleFromRgba(Uint8List rgba) {
+    final gray = <int>[];
+    for (var i = 0; i < rgba.length; i += 4) {
+      final r = rgba[i];
+      final g = rgba[i + 1];
+      final b = rgba[i + 2];
+      gray.add(((r + g + b) / 3).round());
+    }
+    return gray;
+  }
+
+  static double _meanAbsoluteDifference(List<int> a, List<int> b) {
+    if (a.length != b.length) return double.infinity;
+    var sum = 0.0;
+    for (var i = 0; i < a.length; i++) {
+      sum += (a[i] - b[i]).abs();
+    }
+    return sum / a.length;
+  }
+}
 <<<<<<< HEAD
 import 'dart:async';
 import 'dart:io';

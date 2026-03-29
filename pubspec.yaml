@@ -24,4 +24,4 @@ flutter:
   uses-material-design: true
   assets:
     - postere/
-  - docs/project_definition/poze/
+    - docs/project_definition/poze/

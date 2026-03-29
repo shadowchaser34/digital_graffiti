@@ -1,3 +1,8 @@
 {
-    "cmake.sourceDirectory": "C:/digital_graffiti_wall/linux"
+    "cmake.sourceDirectory": "C:/digital_graffiti_wall/linux",
+    "code-runner.runInTerminal": true,
+    "code-runner.executorMapByFileExtension": {
+        ".yaml": "cd /d $workspaceRoot && flutter run -t lib/main.dart",
+        ".yml": "cd /d $workspaceRoot && flutter run -t lib/main.dart"
+    }
 }

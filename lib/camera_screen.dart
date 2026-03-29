@@ -17,7 +17,7 @@ class CameraScreen extends StatelessWidget {
         overlay: Stack(
           children: [
             const CanvasWidget(),
-            const Positioned(top: 12, left: 12, child: Toolbar()),
+            const Positioned(top: 12, left: 12, child: ToolBar()),
           ],
         ),
       ),

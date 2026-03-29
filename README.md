@@ -2,6 +2,27 @@
 
 Minimal collaborative drawing wall using Firebase + Riverpod.
 
+## FastAPI device launcher
+
+This repository now includes a minimal FastAPI dashboard in `backend/` for starting an Android emulator or launching the Flutter app on a connected Android device.
+
+1. Install Python 3.10+ and make sure a real `py -3` or `python` installation is available on your PATH, along with `flutter`. The Windows Store `python.exe` alias is not enough.
+2. From the repo root, install the backend dependencies:
+
+```bash
+python -m pip install -r backend/requirements.txt
+```
+
+3. Start the dashboard:
+
+```bash
+backend\run_dashboard.bat
+```
+
+4. Open `http://127.0.0.1:8000` in a browser.
+
+The dashboard lists Flutter devices and emulators by calling the Flutter CLI, can start an emulator with `flutter emulators --launch <emulator_id>`, and can start the app with `flutter run -d <device_id>`. Use the Stop button to end the most recent launch.
+
 Run (quick start):
 
 1. Create a Firebase project at https://console.firebase.google.com
